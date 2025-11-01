@@ -8,9 +8,9 @@ import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { CommentaryModel } from './commentary.model';
 import { CommentaryReactionModel } from './commentary-reaction.model';
-import { CreateCommentDto } from './dto/create-comment.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
-import { ReactionDto } from './dto/reaction.dto';
+import { CreateCommentDto } from './dto/request/create-comment.dto';
+import { UpdateCommentDto } from './dto/request/update-comment.dto';
+import { ReactionDto } from './dto/request/reaction.dto';
 import { FirebaseService } from '../firebase/firebase.service';
 import { CardService } from '../card/card.service';
 

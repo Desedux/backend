@@ -47,7 +47,9 @@ export class UserService {
 
     await this.userModel.create({
       uid: firebaseUser.uid,
-      role: registerUser.email.includes('alunos') ? 'student' : 'teacher',
+      role: registerUser.email.includes('alunos.newtonpaiva.edu.br')
+        ? 'student'
+        : 'teacher',
     });
 
     return firebaseUser;
