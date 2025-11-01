@@ -129,7 +129,7 @@ npm run build
 npm run start:prod
 ```
 
-Swagger UI: [http://localhost:3000/api](http://localhost:3000/api)
+Swagger UI: [http://localhost:3001/api](http://localhost:3000/api)
 > A porta padrão é `3000`, mas pode ser alterada pela variável `PORT`.
 
 ---

@@ -30,7 +30,7 @@ export class RegisterUserDto {
   @IsEmail()
   @Matches(/^[A-Za-z0-9._%+-]+@(alunos|professores)\.newtonpaiva\.edu\.br$/, {
     message:
-      'O e-mail deve pertencer aos domínios alunos.newtonpaiva.edu.br ou professores.newtonpaiva.edu.br',
+      'The email must belong to the domains alunos.newtonpaiva.edu.br or professores.newtonpaiva.edu.br.',
   })
   email!: string;
 

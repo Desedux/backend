@@ -1,6 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { TagModel } from './tags.model';
 import { TagsService } from './tags.service';
 import { TagResponseDto } from './dto/response/TagResponseDto';
 
@@ -15,7 +14,7 @@ export class TagsController {
     description: 'Retorna todas as tags ativas cadastradas.',
   })
   @ApiOkResponse({ type: TagResponseDto, isArray: true })
-  async getAllTags(): Promise<TagModel[]> {
+  async getAllTags(): Promise<TagResponseDto[]> {
     return await this.tagService.getAllTags();
   }
 }

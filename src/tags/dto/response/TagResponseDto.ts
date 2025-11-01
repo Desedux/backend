@@ -32,4 +32,10 @@ export class TagResponseDto {
     example: '2025-10-31T12:34:56.000Z',
   })
   updated_at: string;
+
+  @ApiProperty({
+    example: 42,
+    description: 'Quantidade de cards ativos vinculados à tag',
+  })
+  count: number;
 }

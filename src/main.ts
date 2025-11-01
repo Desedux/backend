@@ -7,13 +7,20 @@ import * as dotenv from 'dotenv';
 async function bootstrap() {
   dotenv.config();
   const app = await NestFactory.create(AppModule);
+
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
+
   configureSwagger(app);
   configureValidationPipe(app);
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3001;
+  await app.listen(port);
 
   const logger = new Logger('Bootstrap');
-  const port = process.env.PORT ?? 3000;
   logger.log(`App:     http://localhost:${port}`);
   logger.log(`Swagger: http://localhost:${port}/api`);
 }

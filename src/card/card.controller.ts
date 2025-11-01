@@ -73,6 +73,32 @@ export class CardController {
     return await this.cardService.getCardById(cardId);
   }
 
+  @Get('tag/:category/:page')
+  @ApiOperation({ summary: 'Listar cards por categoria paginados' })
+  @ApiParam({
+    name: 'category',
+    type: Number,
+    example: 1,
+    description: 'Categoria (tag) do card',
+  })
+  @ApiParam({
+    name: 'page',
+    type: Number,
+    example: 1,
+    description: 'Número da página (20 itens por página)',
+  })
+  @ApiOkResponse({
+    description: 'Lista retornada com sucesso.',
+    type: CardModel,
+    isArray: true,
+  })
+  async getCardsByCategory(
+    @Param('category') category: number,
+    @Param('page') page: number,
+  ): Promise<CardModel[]> {
+    return this.cardService.getCards(page, category);
+  }
+
   @Post()
   @UseGuards(AuthGuard)
   @ApiBearerAuth()

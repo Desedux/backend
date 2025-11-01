@@ -9,10 +9,11 @@ import { CommentaryModule } from './commentary/commentary.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { TagsModule } from './tags/tags.module';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
-    CardModule,
+    ScheduleModule.forRoot(),
     SequelizeModule.forRoot({
       dialect: 'postgres',
       host: process.env.POSTGRES_HOST || 'localhost',
@@ -25,11 +26,12 @@ import { ConfigModule } from '@nestjs/config';
       models: [],
       logging: false,
     }),
+    CardModule,
     AuthModule,
     UserModule,
     CommentaryModule,
-    FirebaseModule.forRoot(),
     TagsModule,
+    FirebaseModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
   ],
   controllers: [AppController],
