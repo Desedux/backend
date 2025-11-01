@@ -337,6 +337,15 @@ Relacionamentos:
 * `EMAIL_USER` e `EMAIL_PASSWORD` devem pertencer a uma conta habilitada para envio no provedor configurado.
 
 ---
+## Contribuidores
+
+Abaixo os nomes das pessoas que contribuíram para o projeto. Adicione nome e, opcionalmente, o papel.
+
+- Nome Completo — papel (ex.: backend, frontend, design)
+- Gabriel Marliere de Souza — backend
+- Gabriel de Almeida Paro — backend
+- Ryan Alves da Costa — design
+- Alexandre de Noronha José — frontend
 
 ## Licença
 
