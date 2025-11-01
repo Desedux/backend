@@ -9,6 +9,7 @@ import { UserModule } from './user/user.module';
 import { CommentaryModule } from './commentary/commentary.module';
 import { FirebaseModule } from './firebase/firebase.module';
 import { TagsModule } from './tags/tags.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -29,8 +30,9 @@ import { TagsModule } from './tags/tags.module';
     AuthModule,
     UserModule,
     CommentaryModule,
-    FirebaseModule,
+    FirebaseModule.forRoot(),
     TagsModule,
+    ConfigModule.forRoot({ isGlobal: true }),
   ],
   controllers: [AppController],
   providers: [AppService],

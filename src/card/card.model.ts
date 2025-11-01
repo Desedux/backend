@@ -34,6 +34,9 @@ export class CardModel extends Model<
   @Column({ type: DataType.STRING, allowNull: false })
   declare user_id: string;
 
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  declare deactivated: boolean;
+
   @BelongsToMany(() => TagModel, () => CardTagModel)
   declare tags?: TagModel[];
 }

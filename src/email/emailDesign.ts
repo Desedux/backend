@@ -14,7 +14,7 @@ export function emailDesign(username: string, key: string): string {
 
       body {
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-          background: linear-gradient(135deg, #742727 0%, #5a1a1a 100%);
+          background-color: #f4f4f4;
           padding: 40px 20px;
           min-height: 100vh;
       }
@@ -25,7 +25,7 @@ export function emailDesign(username: string, key: string): string {
           background-color: #ffffff;
           border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
       }
 
       .header {
@@ -37,7 +37,7 @@ export function emailDesign(username: string, key: string): string {
       .logo {
           font-size: 32px;
           font-weight: 800;
-          color: #ffffff;
+          color: #ececec;
           margin-bottom: 10px;
           letter-spacing: -1px;
       }
@@ -256,7 +256,7 @@ export function emailDesign(username: string, key: string): string {
     </div>
 
     <div class="intro-text">
-      Recebemos uma solicitação para autenticar sua conta. Para continuar, utilize o código de verificação abaixo. Este código é único e foi gerado especialmente para você.
+      Recebemos uma solicitação para autenticar a sua conta. Para continuar, utilize o código de verificação abaixo. Este código é único e foi gerado especialmente para você.
     </div>
 
     <div class="code-box">

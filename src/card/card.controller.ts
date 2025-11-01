@@ -12,18 +12,20 @@ import { CardService } from './card.service';
 import { CreateCardDto } from './dto/request/createCard';
 import { AuthGuard } from '../auth/auth.guard';
 import { UserUid } from '../decorator/user-uid.decorator';
+import { CardModel } from './card.model';
+import { VoteDto } from './dto/request/updateCard';
 
 @Controller('card')
 export class CardController {
   constructor(private readonly cardService: CardService) {}
-  @Get()
-  getAllCards() {
-    return 'This action returns all cards';
+  @Get(':page')
+  getAllCards(@Param('page') page: number): Promise<CardModel[]> {
+    return this.cardService.getCards(page);
   }
 
   @Get('detail/:id')
-  getCardById(@Param('id') cardId: string) {
-    return `This action returns a card by ${cardId}`;
+  async getCardById(@Param('id') cardId: string): Promise<CardModel> {
+    return await this.cardService.getCardById(cardId);
   }
 
   @Post()
@@ -37,12 +39,15 @@ export class CardController {
   }
 
   @Patch(':id')
-  updateCard(@Param('id') cardId: string) {
-    return 'This action updates a card';
+  @UseGuards(AuthGuard)
+  async voteCard(@Param('id') cardId: string, @Body() dto: VoteDto) {
+    await this.cardService.vote(cardId, dto.isUpvote);
   }
 
   @Delete(':id')
-  deleteCard(@Param('id') cardId: string) {
+  @UseGuards(AuthGuard)
+  async deleteCard(@Param('id') cardId: string, @UserUid() userUid: string) {
+    await this.cardService.deleteCard(cardId, userUid);
     return 'This action deletes a card';
   }
 }

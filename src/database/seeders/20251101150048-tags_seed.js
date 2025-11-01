@@ -3,7 +3,6 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    //todo: alterar tags Ryan ficou responsavel
     await queryInterface.bulkInsert('tag', [
       {
         name: 'Segurança',

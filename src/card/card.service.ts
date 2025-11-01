@@ -33,6 +33,7 @@ export class CardService {
       author: createCardDto.isAnonymous ? 'Anônimo' : user.displayName!,
       user_id: userUid,
       up_down: 0,
+      deactivated: false,
     });
 
     await card.$set(
@@ -43,7 +44,7 @@ export class CardService {
 
   async getCardById(cardId: string): Promise<CardModel> {
     const card = await this.cardModel.findByPk(cardId);
-    if (!card) {
+    if (!card || card.deactivated) {
       throw new HttpException('Card not found', 404);
     }
     return card;
@@ -54,8 +55,8 @@ export class CardService {
     const offset = (page - 1) * limit;
 
     const where = category
-      ? { tags: { [Op.contains]: [category] } }
-      : undefined;
+      ? { tags: { [Op.contains]: [category] }, deactivated: false }
+      : { deactivated: false };
 
     const cards = await this.cardModel.findAll({
       where,
@@ -94,5 +95,16 @@ export class CardService {
       ? { up_down: card.up_down + 1 }
       : { up_down: card.up_down - 1 };
     await card.update(updateData);
+  }
+
+  async deleteCard(cardId: string, userUid: string) {
+    const card = await this.getCardById(cardId);
+    if (!card) {
+      throw new HttpException('Card not found', 404);
+    }
+    if (card.user_id !== userUid) {
+      throw new HttpException('Forbidden', 403);
+    }
+    await card.update({ deactivated: true });
   }
 }
