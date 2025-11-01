@@ -7,7 +7,10 @@ export class TagResponseDto {
   @ApiProperty({ example: 'Backend' })
   name: string;
 
-  @ApiProperty({ example: 'Assuntos sobre desenvolvimento backend', nullable: true })
+  @ApiProperty({
+    example: 'Assuntos sobre desenvolvimento backend',
+    nullable: true,
+  })
   description: string | null;
 
   @ApiProperty({
