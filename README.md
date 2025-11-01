@@ -347,6 +347,8 @@ Abaixo os nomes das pessoas que contribuíram para o projeto. Adicione nome e, o
 - Ryan Alves da Costa — design
 - Alexandre de Noronha José — frontend
 
+---
+
 ## Licença
 
 
