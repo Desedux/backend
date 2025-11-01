@@ -16,6 +16,8 @@ import {
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiTooManyRequestsResponse,
+  ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
 import { IdToken } from '../auth/id-token.decorator';
 import { AuthGuard } from '../auth/auth.guard';
@@ -23,6 +25,7 @@ import { GenerateTokenDto } from './dto/generateToken.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { RegisterUserDto } from './dto/register-user.dto';
 
+@ApiTags('user')
 @Controller('user')
 export class UserController {
   constructor(
@@ -30,6 +33,11 @@ export class UserController {
     private readonly firebaseService: FirebaseService,
   ) {}
 
+  @ApiOperation({
+    summary: 'Registrar usuário',
+    description:
+      'Cria a conta a partir do e-mail, código de verificação e senha. Retorna uma mensagem de sucesso quando o registro é concluído.',
+  })
   @ApiCreatedResponse({
     description: 'User registered successfully',
     schema: {
@@ -72,6 +80,11 @@ export class UserController {
     throw new HttpException('Error registering user.', 500);
   }
 
+  @ApiOperation({
+    summary: 'Alterar senha',
+    description:
+      'Atualiza a senha usando o código de verificação enviado por e-mail. Em caso de sucesso retorna uma mensagem de confirmação.',
+  })
   @Patch('change-password')
   @ApiOkResponse({
     description: 'Password changed successfully',
@@ -111,6 +124,11 @@ export class UserController {
     return { message: 'Password changed successfully', status: 200 };
   }
 
+  @ApiOperation({
+    summary: 'Enviar código para redefinição',
+    description:
+      'Se o e-mail estiver cadastrado, envia um código para redefinição de senha. A resposta é genérica para não expor a existência do e-mail.',
+  })
   @Post('refactor-token')
   @ApiOkResponse({
     description: 'If the email is registered, a code has been sent',
@@ -138,6 +156,11 @@ export class UserController {
     };
   }
 
+  @ApiOperation({
+    summary: 'Enviar código de verificação de cadastro',
+    description:
+      'Gera e envia um código de verificação para finalizar o registro de novos usuários.',
+  })
   @Post('verification-token')
   @ApiOkResponse({
     description: 'Verification code sent to your email',
@@ -168,6 +191,11 @@ export class UserController {
     return { message: 'Verification code sent to your email' };
   }
 
+  @ApiOperation({
+    summary: 'Obter perfil do usuário autenticado',
+    description:
+      'Valida o ID token do Firebase e retorna as claims do usuário autenticado.',
+  })
   @Get('profile')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()

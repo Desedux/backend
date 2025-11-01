@@ -3,7 +3,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CardModule } from './card/card.module';
 import { SequelizeModule } from '@nestjs/sequelize';
-import { CategoryModule } from './category/category.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { CommentaryModule } from './commentary/commentary.module';
@@ -26,7 +25,6 @@ import { ConfigModule } from '@nestjs/config';
       models: [],
       logging: false,
     }),
-    CategoryModule,
     AuthModule,
     UserModule,
     CommentaryModule,
