@@ -6,10 +6,11 @@ import { CardController } from './card.controller';
 import { FirebaseService } from '../firebase/firebase.service';
 import { TagsModule } from '../tags/tags.module';
 import { CardTagModel } from './card-tag.model';
+import { CardVoteModel } from './card-vote.model';
 
 @Module({
   imports: [
-    SequelizeModule.forFeature([CardModel, CardTagModel]),
+    SequelizeModule.forFeature([CardModel, CardTagModel, CardVoteModel]),
     forwardRef(() => TagsModule),
   ],
   providers: [CardService, FirebaseService],

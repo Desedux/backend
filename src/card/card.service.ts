@@ -7,11 +7,14 @@ import { QueryTypes } from 'sequelize';
 import { TagsService } from '../tags/tags.service';
 import { Interval } from '@nestjs/schedule';
 import { TagModel } from '../tags/tags.model';
+import { CardVoteModel } from './card-vote.model';
 
 @Injectable()
 export class CardService implements OnModuleInit {
   constructor(
     @InjectModel(CardModel) private readonly cardModel: typeof CardModel,
+    @InjectModel(CardVoteModel)
+    private readonly cardVoteModel: typeof CardVoteModel,
     private readonly firebaseService: FirebaseService,
     private readonly tagsService: TagsService,
   ) {}
@@ -191,12 +194,37 @@ export class CardService implements OnModuleInit {
     return (results as { tag: string }[]).map((r) => r.tag);
   }
 
-  async vote(cardId: string, like: boolean): Promise<void> {
+  async vote(cardId: string, like: boolean, userUid: string): Promise<void> {
     const card = await this.getCardById(cardId);
-    const updateData = like
-      ? { up_down: card.up_down + 1 }
-      : { up_down: card.up_down - 1 };
-    await card.update(updateData);
+    const newVote = like ? 1 : -1;
+
+    await this.cardModel.sequelize!.transaction(async (t) => {
+      const existing = await this.cardVoteModel.findOne({
+        where: { card_id: card.id, user_id: userUid },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+
+      if (!existing) {
+        await this.cardVoteModel.create(
+          { card_id: card.id, user_id: userUid, vote: newVote },
+          { transaction: t },
+        );
+        await card.update(
+          { up_down: card.up_down + newVote },
+          { transaction: t },
+        );
+        return;
+      }
+
+      if (existing.vote === newVote) {
+        return;
+      }
+
+      const delta = newVote - existing.vote;
+      await existing.update({ vote: newVote }, { transaction: t });
+      await card.update({ up_down: card.up_down + delta }, { transaction: t });
+    });
   }
 
   async deleteCard(cardId: string, userUid: string) {

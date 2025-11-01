@@ -167,8 +167,12 @@ export class CardController {
     description: 'Não autenticado.',
     schema: { example: { statusCode: 401, message: 'Unauthorized' } },
   })
-  async voteCard(@Param('id') cardId: string, @Body() dto: VoteDto) {
-    await this.cardService.vote(cardId, dto.isUpvote);
+  async voteCard(
+    @Param('id') cardId: string,
+    @Body() dto: VoteDto,
+    @UserUid() userUid: string,
+  ) {
+    await this.cardService.vote(cardId, dto.isUpvote, userUid);
   }
 
   @Delete(':id')
