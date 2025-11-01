@@ -1,13 +1,14 @@
-import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayNotEmpty,
+  ArrayMinSize,
+  IsNumber,
   IsBoolean,
   IsNotEmpty,
   IsString,
   MaxLength,
-  ArrayNotEmpty,
-  ArrayMinSize,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateCardDto {
   @IsString()
@@ -23,11 +24,11 @@ export class CreateCardDto {
   @IsArray()
   @ArrayNotEmpty()
   @ArrayMinSize(1)
-  @IsString({ each: true })
-  tags: string[];
+  @Type(() => Number)
+  @IsNumber({}, { each: true })
+  tags: number[];
 
-  @Type(() => Boolean)
   @IsBoolean()
   @IsNotEmpty()
-  isAnonymous: boolean = false;
+  isAnonymous: boolean;
 }

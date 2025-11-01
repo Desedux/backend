@@ -3,12 +3,14 @@ import { CreateCardDto } from './dto/request/createCard';
 import { InjectModel } from '@nestjs/sequelize';
 import { CardModel } from './card.model';
 import { FirebaseService } from '../firebase/firebase.service';
-
+import { Op, QueryTypes } from 'sequelize';
+import { TagsService } from '../tags/tags.service';
 @Injectable()
 export class CardService {
   constructor(
     @InjectModel(CardModel) private readonly cardModel: typeof CardModel,
     private readonly firebaseService: FirebaseService,
+    private readonly tagsService: TagsService,
   ) {}
 
   async createCard(
@@ -19,13 +21,78 @@ export class CardService {
     if (!user) {
       throw new HttpException('User not found', 404);
     }
-    await this.cardModel.create({
+
+    const tags = await this.tagsService.getTagByIds(createCardDto.tags);
+    if (!tags.length) {
+      throw new HttpException('Tags not found', 400);
+    }
+
+    const card = await this.cardModel.create({
       title: createCardDto.title,
       description: createCardDto.description,
-      tags: createCardDto.tags,
       author: createCardDto.isAnonymous ? 'Anônimo' : user.displayName!,
       user_id: userUid,
       up_down: 0,
     });
+
+    await card.$set(
+      'tags',
+      tags.map((t) => t.id),
+    );
+  }
+
+  async getCardById(cardId: string): Promise<CardModel> {
+    const card = await this.cardModel.findByPk(cardId);
+    if (!card) {
+      throw new HttpException('Card not found', 404);
+    }
+    return card;
+  }
+
+  async getCards(page: number, category?: string): Promise<CardModel[]> {
+    const limit = 20;
+    const offset = (page - 1) * limit;
+
+    const where = category
+      ? { tags: { [Op.contains]: [category] } }
+      : undefined;
+
+    const cards = await this.cardModel.findAll({
+      where,
+      limit,
+      offset,
+      order: [['up_down', 'DESC']],
+    });
+
+    return cards.length > 0 ? cards : [];
+  }
+
+  async getCardCategories(): Promise<string[]> {
+    if (!this.cardModel.sequelize) {
+      return [];
+    }
+
+    const sql = `
+    SELECT DISTINCT UNNEST(tags) AS tag
+    FROM card
+    WHERE array_length(tags, 1) > 0
+  `;
+
+    const results = await this.cardModel.sequelize.query<{ tag: string }>(sql, {
+      type: QueryTypes.SELECT,
+    });
+
+    return (results as { tag: string }[]).map((r) => r.tag);
+  }
+
+  async vote(cardId: string, like: boolean): Promise<void> {
+    const card = await this.getCardById(cardId);
+    if (!card) {
+      throw new HttpException('Card not found', 404);
+    }
+    const updateData = like
+      ? { up_down: card.up_down + 1 }
+      : { up_down: card.up_down - 1 };
+    await card.update(updateData);
   }
 }

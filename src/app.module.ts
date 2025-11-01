@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { CommentaryModule } from './commentary/commentary.module';
 import { FirebaseModule } from './firebase/firebase.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { FirebaseModule } from './firebase/firebase.module';
     UserModule,
     CommentaryModule,
     FirebaseModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

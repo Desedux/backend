@@ -17,10 +17,6 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: false,
       },
-      tags: {
-        type: Sequelize.ARRAY(Sequelize.STRING),
-        allowNull: false,
-      },
       author: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -32,6 +28,16 @@ module.exports = {
       user_id: {
         type: Sequelize.STRING,
         allowNull: false,
+      },
+      created_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.fn('NOW'),
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.fn('NOW'),
       },
     });
   },
