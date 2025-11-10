@@ -1,4 +1,9 @@
-import { HttpException, Injectable, OnModuleInit } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { CreateCardDto } from './dto/request/createCard';
 import { InjectModel } from '@nestjs/sequelize';
 import { CardModel } from './card.model';
@@ -11,6 +16,8 @@ import { CardVoteModel } from './card-vote.model';
 
 @Injectable()
 export class CardService implements OnModuleInit {
+  private logger: Logger = new Logger();
+
   constructor(
     @InjectModel(CardModel) private readonly cardModel: typeof CardModel,
     @InjectModel(CardVoteModel)
@@ -38,10 +45,10 @@ export class CardService implements OnModuleInit {
       total: any;
     }>(
       `
-        SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
-        FROM card_tags ct
-               JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-        GROUP BY ct.tag_id
+          SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
+          FROM card_tags ct
+                   JOIN card c ON c.id = ct.card_id AND c.deactivated = false
+          GROUP BY ct.tag_id
       `,
       { type: QueryTypes.SELECT },
     );
@@ -56,10 +63,10 @@ export class CardService implements OnModuleInit {
     if (!this.cardModel.sequelize) return;
     const row = await this.cardModel.sequelize.query<{ total: any }>(
       `
-      SELECT COUNT(DISTINCT c.id) AS total
-      FROM card_tags ct
-      JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-      WHERE ct.tag_id = :tagId
+          SELECT COUNT(DISTINCT c.id) AS total
+          FROM card_tags ct
+                   JOIN card c ON c.id = ct.card_id AND c.deactivated = false
+          WHERE ct.tag_id = :tagId
       `,
       { type: QueryTypes.SELECT, replacements: { tagId } },
     );
@@ -88,11 +95,11 @@ export class CardService implements OnModuleInit {
         total: any;
       }>(
         `
-        SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
-        FROM card_tags ct
-        JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-        WHERE ct.tag_id IN (:ids)
-        GROUP BY ct.tag_id
+            SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
+            FROM card_tags ct
+                     JOIN card c ON c.id = ct.card_id AND c.deactivated = false
+            WHERE ct.tag_id IN (:ids)
+            GROUP BY ct.tag_id
         `,
         { type: QueryTypes.SELECT, replacements: { ids: missing } },
       );
@@ -184,9 +191,9 @@ export class CardService implements OnModuleInit {
   async getCardCategories(): Promise<string[]> {
     if (!this.cardModel.sequelize) return [];
     const sql = `
-      SELECT DISTINCT UNNEST(tags) AS tag
-      FROM card
-      WHERE array_length(tags, 1) > 0
+        SELECT DISTINCT UNNEST(tags) AS tag
+        FROM card
+        WHERE array_length(tags, 1) > 0
     `;
     const results = await this.cardModel.sequelize.query<{ tag: string }>(sql, {
       type: QueryTypes.SELECT,
@@ -198,33 +205,39 @@ export class CardService implements OnModuleInit {
     const card = await this.getCardById(cardId);
     const newVote = like ? 1 : -1;
 
-    await this.cardModel.sequelize!.transaction(async (t) => {
-      const existing = await this.cardVoteModel.findOne({
-        where: { card_id: card.id, user_id: userUid },
-        transaction: t,
-        lock: t.LOCK.UPDATE,
-      });
-
-      if (!existing) {
-        await this.cardVoteModel.create(
-          { card_id: card.id, user_id: userUid, vote: newVote },
-          { transaction: t },
-        );
-        await card.update(
-          { up_down: card.up_down + newVote },
-          { transaction: t },
-        );
-        return;
-      }
-
-      if (existing.vote === newVote) {
-        return;
-      }
-
-      const delta = newVote - existing.vote;
-      await existing.update({ vote: newVote }, { transaction: t });
-      await card.update({ up_down: card.up_down + delta }, { transaction: t });
+    const existingVote = await this.cardVoteModel.findOne({
+      where: {
+        card_id: card.id,
+        user_id: userUid,
+      },
     });
+
+    if (existingVote && existingVote.vote === newVote) {
+      this.logger.warn(
+        `User ${userUid} attempted to vote the same way again on card ${cardId}`,
+      );
+      return;
+    }
+
+    if (!existingVote) {
+      await this.cardVoteModel.create({
+        card_id: card.id!,
+        user_id: userUid,
+        vote: newVote,
+      });
+    } else {
+      await existingVote.update({ vote: newVote });
+    }
+
+    const sumRaw = await this.cardVoteModel.sum('vote', {
+      where: { card_id: card.id },
+    });
+
+    let updatedSum = Number(sumRaw ?? 0) - newVote;
+    if (updatedSum < 0) {
+      updatedSum = 0;
+    }
+    await card.update({ up_down: updatedSum });
   }
 
   async deleteCard(cardId: string, userUid: string) {
@@ -234,7 +247,9 @@ export class CardService implements OnModuleInit {
 
     if (this.cardModel.sequelize) {
       const rows = await this.cardModel.sequelize.query<{ tag_id: number }>(
-        `SELECT tag_id FROM card_tags WHERE card_id = :cardId`,
+        `SELECT tag_id
+         FROM card_tags
+         WHERE card_id = :cardId`,
         { type: QueryTypes.SELECT, replacements: { cardId } },
       );
       for (const r of rows) {

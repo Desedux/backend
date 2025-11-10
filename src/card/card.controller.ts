@@ -141,21 +141,19 @@ export class CardController {
     return 'This action adds a new card';
   }
 
-  @Patch(':id')
+  @Patch()
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Votar em um card (up/down)' })
-  @ApiParam({
-    name: 'id',
-    type: String,
-    example: '1',
+  @ApiBody({
+    examples: {},
     description: 'ID do card',
   })
   @ApiBody({
     type: VoteDto,
     examples: {
-      upvote: { value: { isUpvote: true } },
-      downvote: { value: { isUpvote: false } },
+      upvote: { value: { isUpvote: true, cardId: '1' } },
+      downvote: { value: { isUpvote: false, cardId: '1' } },
     },
   })
   @ApiNoContentResponse({ description: 'Voto registrado.' })
@@ -163,16 +161,12 @@ export class CardController {
     description: 'Card não encontrado.',
     schema: { example: { statusCode: 404, message: 'Card not found' } },
   })
-  @ApiUnauthorizedResponse({
+  @ApiForbiddenResponse({
     description: 'Não autenticado.',
-    schema: { example: { statusCode: 401, message: 'Unauthorized' } },
+    schema: { example: { statusCode: 403, message: 'Forbidden Access' } },
   })
-  async voteCard(
-    @Param('id') cardId: string,
-    @Body() dto: VoteDto,
-    @UserUid() userUid: string,
-  ) {
-    await this.cardService.vote(cardId, dto.isUpvote, userUid);
+  async voteCard(@Body() dto: VoteDto, @UserUid() userUid: string) {
+    await this.cardService.vote(dto.cardId, dto.isUpvote, userUid);
   }
 
   @Delete(':id')
