@@ -233,10 +233,7 @@ export class CardService implements OnModuleInit {
       where: { card_id: card.id },
     });
 
-    let updatedSum = Number(sumRaw ?? 0) - newVote;
-    if (updatedSum < 0) {
-      updatedSum = 0;
-    }
+    const updatedSum = Number(sumRaw ?? 0);
     await card.update({ up_down: updatedSum });
   }
 

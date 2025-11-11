@@ -3,16 +3,16 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import { CommentaryModel } from './commentary.model';
-import { CommentaryReactionModel } from './commentary-reaction.model';
 import { CreateCommentDto } from './dto/request/create-comment.dto';
 import { UpdateCommentDto } from './dto/request/update-comment.dto';
-import { ReactionDto } from './dto/request/reaction.dto';
 import { FirebaseService } from '../firebase/firebase.service';
 import { CardService } from '../card/card.service';
+import { CommentVoteModel } from './commentary-vote.model';
 
 type ListOptions = {
   parentCommentId?: number;
@@ -22,11 +22,13 @@ type ListOptions = {
 
 @Injectable()
 export class CommentaryService {
+  private logger: Logger = new Logger();
+
   constructor(
     @InjectModel(CommentaryModel)
     private readonly commentModel: typeof CommentaryModel,
-    @InjectModel(CommentaryReactionModel)
-    private readonly reactionModel: typeof CommentaryReactionModel,
+    @InjectModel(CommentVoteModel)
+    private readonly commentVoteModel: typeof CommentVoteModel,
     @InjectConnection() private readonly sequelize: Sequelize,
     private readonly firebaseService: FirebaseService,
     private readonly cardService: CardService,
@@ -113,89 +115,53 @@ export class CommentaryService {
     return comment;
   }
 
-  // Remove comentário (somente autor)
-  async remove(cardId: number, commentId: number, userUid: string) {
-    await this.cardService.getCardById(String(cardId));
-
-    const comment = await this.commentModel.findOne({
-      where: { id: commentId, card_id: cardId },
-    });
-    if (!comment) throw new NotFoundException('Comment not found');
-    if (comment.user_uid !== userUid) {
-      throw new ForbiddenException('You cannot delete this comment');
-    }
-
-    await this.sequelize.transaction(async (transaction) => {
-      await this.reactionModel.destroy({
-        where: { comment_id: commentId },
-        transaction,
-      });
-      // se não houver cascade para replies no banco, avalie remover em cascata aqui
-      await comment.destroy({ transaction });
-    });
-
-    return { success: true };
-  }
-
-  // Define minha reação (like/dislike/none) e ajusta up_down
-  async setReaction(
-    cardId: number,
-    commentId: number,
-    action: ReactionDto['action'],
+  async vote(
+    cardId: string,
+    commentId: string,
+    like: boolean,
     userUid: string,
-  ) {
-    if (!['like', 'dislike', 'none'].includes(action)) {
-      throw new BadRequestException('Invalid reaction');
-    }
-
-    await this.cardService.getCardById(String(cardId));
+  ): Promise<void> {
+    const card = await this.cardService.getCardById(cardId);
 
     const comment = await this.commentModel.findOne({
-      where: { id: commentId, card_id: cardId },
+      where: { id: commentId, card_id: card.id },
     });
-    if (!comment) throw new NotFoundException('Comment not found');
 
-    const scoreOf = (r: 'like' | 'dislike' | 'none') =>
-      r === 'like' ? 1 : r === 'dislike' ? -1 : 0;
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
 
-    await this.sequelize.transaction(async (transaction) => {
-      const existing = await this.reactionModel.findOne({
-        where: { comment_id: commentId, user_uid: userUid },
-        transaction,
-      });
+    const newVote = like ? 1 : -1;
 
-      const current: 'like' | 'dislike' | 'none' =
-        (existing?.action as any) ?? 'none';
-      const next = action;
-
-      const delta = scoreOf(next) - scoreOf(current);
-
-      if (delta !== 0) {
-        await comment.increment('up_down', { by: delta, transaction });
-      }
-
-      if (next === 'none') {
-        if (existing) await existing.destroy({ transaction });
-      } else if (existing) {
-        existing.action = next;
-        await existing.save({ transaction });
-      } else {
-        await this.reactionModel.create(
-          { comment_id: commentId, user_uid: userUid, action: next },
-          { transaction },
-        );
-      }
-
-      const updated = await this.commentModel.findByPk(commentId, {
-        attributes: ['id', 'up_down'],
-        transaction,
-      });
-
-      return {
-        commentId,
-        up_down: updated?.up_down ?? 0,
-        myReaction: next,
-      };
+    const existingVote = await this.commentVoteModel.findOne({
+      where: {
+        comment_id: comment.id,
+        user_id: userUid,
+      },
     });
+
+    if (existingVote && existingVote.vote === newVote) {
+      this.logger.warn(
+        `User ${userUid} attempted to vote the same way again on comment ${commentId}`,
+      );
+      return;
+    }
+
+    if (!existingVote) {
+      await this.commentVoteModel.create({
+        comment_id: comment.id,
+        user_id: userUid,
+        vote: newVote,
+      });
+    } else {
+      await existingVote.update({ vote: newVote });
+    }
+
+    const sumRaw = await this.commentVoteModel.sum('vote', {
+      where: { comment_id: comment.id },
+    });
+
+    const updatedSum = Number(sumRaw ?? 0);
+    await comment.update({ up_down: updatedSum });
   }
 }

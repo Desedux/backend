@@ -4,6 +4,7 @@ import {
   ApiBody,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -15,7 +16,6 @@ import {
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -28,12 +28,10 @@ import { CommentaryService } from './commentary.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { CreateCommentDto } from './dto/request/create-comment.dto';
 import { UpdateCommentDto } from './dto/request/update-comment.dto';
-import { ReactionDto } from './dto/request/reaction.dto';
+import { VoteCommentaryDto } from './dto/request/reaction.dto';
 import { UserUid } from '../decorator/user-uid.decorator';
 import { CommentResponseDto } from './dto/request/comment.response.dto';
 import { PaginatedCommentsResponse } from './dto/response/PaginatedCommentsResponse';
-import { DeleteResponseDto } from './dto/response/DeleteResponseDto';
-import { ReactionResponseDto } from './dto/response/ReactionResponseDto';
 
 @ApiTags('commentary')
 @Controller('commentary')
@@ -190,97 +188,34 @@ export class CommentaryController {
     return this.commentaryService.update(cardId, commentId, dto, userUid);
   }
 
+  @Patch()
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  @Delete(':cardId/:commentId')
-  @ApiOperation({ summary: 'Remover comentário (somente autor)' })
-  @ApiParam({
-    name: 'cardId',
-    type: Number,
-    example: 1,
+  @ApiOperation({ summary: 'Votar em um card (up/down)' })
+  @ApiBody({
+    examples: {},
     description: 'ID do card',
-  })
-  @ApiParam({
-    name: 'commentId',
-    type: Number,
-    example: 10,
-    description: 'ID do comentário',
-  })
-  @ApiOkResponse({
-    description: 'Comentário removido.',
-    type: DeleteResponseDto,
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Usuário não autenticado.',
-    schema: { example: { statusCode: 401, message: 'Unauthorized' } },
-  })
-  @ApiForbiddenResponse({
-    description: 'Remoção não permitida (não é o autor).',
-    schema: {
-      example: { statusCode: 403, message: 'You cannot delete this comment' },
-    },
-  })
-  @ApiNotFoundResponse({
-    description: 'Card ou comentário não encontrado.',
-    schema: { example: { statusCode: 404, message: 'Comment not found' } },
-  })
-  async remove(
-    @Param('cardId', ParseIntPipe) cardId: number,
-    @Param('commentId', ParseIntPipe) commentId: number,
-    @UserUid() userUid: string,
-  ) {
-    return this.commentaryService.remove(cardId, commentId, userUid);
-  }
-
-  @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @Patch(':cardId/:commentId/reaction')
-  @ApiOperation({
-    summary: 'Definir minha reação ao comentário (like/dislike/none)',
-  })
-  @ApiParam({
-    name: 'cardId',
-    type: Number,
-    example: 1,
-    description: 'ID do card',
-  })
-  @ApiParam({
-    name: 'commentId',
-    type: Number,
-    example: 10,
-    description: 'ID do comentário',
   })
   @ApiBody({
-    description: 'Ação de reação do usuário',
-    type: ReactionDto,
+    type: VoteCommentaryDto,
+    examples: {
+      upvote: { value: { isUpvote: true, cardId: '1', commentaryId: null } },
+    },
   })
-  @ApiOkResponse({
-    description:
-      'Reação aplicada. Retorna up_down atualizado e sua reação atual.',
-    type: ReactionResponseDto,
-  })
-  @ApiBadRequestResponse({
-    description: 'Reação inválida.',
-    schema: { example: { statusCode: 400, message: 'Invalid reaction' } },
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Usuário não autenticado.',
-    schema: { example: { statusCode: 401, message: 'Unauthorized' } },
-  })
+  @ApiNoContentResponse({ description: 'Voto registrado.' })
   @ApiNotFoundResponse({
-    description: 'Card ou comentário não encontrado.',
-    schema: { example: { statusCode: 404, message: 'Comment not found' } },
+    description: 'Card não encontrado.',
+    schema: { example: { statusCode: 404, message: 'Card not found' } },
   })
-  async setReaction(
-    @Param('cardId', ParseIntPipe) cardId: number,
-    @Param('commentId', ParseIntPipe) commentId: number,
-    @Body() dto: ReactionDto,
-    @UserUid() userUid: string,
-  ) {
-    return this.commentaryService.setReaction(
-      cardId,
-      commentId,
-      dto.action,
+  @ApiForbiddenResponse({
+    description: 'Não autenticado.',
+    schema: { example: { statusCode: 403, message: 'Forbidden Access' } },
+  })
+  async voteCard(@Body() dto: VoteCommentaryDto, @UserUid() userUid: string) {
+    await this.commentaryService.vote(
+      dto.cardId,
+      dto.commentaryId,
+      dto.isUpvote,
       userUid,
     );
   }
