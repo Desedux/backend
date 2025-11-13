@@ -1,11 +1,14 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -35,7 +38,7 @@ import { VoteDto } from './dto/request/updateCard';
 export class CardController {
   constructor(private readonly cardService: CardService) {}
 
-  @Get(':page')
+  @Get()
   @ApiOperation({ summary: 'Listar cards paginados' })
   @ApiParam({
     name: 'page',
@@ -48,7 +51,9 @@ export class CardController {
     type: CardModel,
     isArray: true,
   })
-  async getAllCards(@Param('page') page: number): Promise<CardModel[]> {
+  async getAllCards(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ): Promise<CardModel[]> {
     return this.cardService.getCards(page);
   }
 
@@ -74,7 +79,7 @@ export class CardController {
     return await this.cardService.getCardById(cardId);
   }
 
-  @Get('tag/:category/:page')
+  @Get('tag/:category')
   @ApiOperation({ summary: 'Listar cards por categoria paginados' })
   @ApiParam({
     name: 'category',
@@ -95,7 +100,7 @@ export class CardController {
   })
   async getCardsByCategory(
     @Param('category') category: number,
-    @Param('page') page: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
   ): Promise<CardModel[]> {
     return this.cardService.getCards(page, category);
   }
@@ -137,9 +142,8 @@ export class CardController {
   async createCard(
     @Body() createCardDto: CreateCardDto,
     @UserUid() userUid: string,
-  ) {
-    await this.cardService.createCard(createCardDto, userUid);
-    return 'This action adds a new card';
+  ) : Promise<CardModel>{
+    return await this.cardService.createCard(createCardDto, userUid);
   }
 
   @Patch()

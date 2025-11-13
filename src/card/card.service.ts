@@ -131,7 +131,7 @@ export class CardService implements OnModuleInit {
   async createCard(
     createCardDto: CreateCardDto,
     userUid: string,
-  ): Promise<void> {
+  ): Promise<CardModel> {
     const user = await this.firebaseService.getUserByUid(userUid);
     if (!user) throw new HttpException('User not found', 404);
 
@@ -151,6 +151,7 @@ export class CardService implements OnModuleInit {
     await card.$set('tags', tagIds);
     for (const id of tagIds)
       this.tagCountCache.set(id, (this.tagCountCache.get(id) ?? 0) + 1);
+    return card;
   }
 
   async getCardById(cardId: string): Promise<CardModel> {
