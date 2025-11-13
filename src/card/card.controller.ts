@@ -12,6 +12,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -165,8 +166,15 @@ export class CardController {
     description: 'Não autenticado.',
     schema: { example: { statusCode: 403, message: 'Forbidden Access' } },
   })
-  async voteCard(@Body() dto: VoteDto, @UserUid() userUid: string) {
-    await this.cardService.vote(dto.cardId, dto.isUpvote, userUid);
+  @ApiConflictResponse({
+    description: 'Usuário já votou da mesma forma anteriormente.',
+    schema: { example: { statusCode: 409, message: 'Conflict' } },
+  })
+  async voteCard(
+    @Body() dto: VoteDto,
+    @UserUid() userUid: string,
+  ): Promise<CardModel> {
+    return await this.cardService.vote(dto.cardId, dto.isUpvote, userUid);
   }
 
   @Delete(':id')

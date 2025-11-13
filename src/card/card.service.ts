@@ -201,7 +201,11 @@ export class CardService implements OnModuleInit {
     return (results as { tag: string }[]).map((r) => r.tag);
   }
 
-  async vote(cardId: string, like: boolean, userUid: string): Promise<void> {
+  async vote(
+    cardId: string,
+    like: boolean,
+    userUid: string,
+  ): Promise<CardModel> {
     const card = await this.getCardById(cardId);
     const newVote = like ? 1 : -1;
 
@@ -216,7 +220,7 @@ export class CardService implements OnModuleInit {
       this.logger.warn(
         `User ${userUid} attempted to vote the same way again on card ${cardId}`,
       );
-      return;
+      throw new HttpException('Vote already recorded', 409);
     }
 
     if (!existingVote) {
@@ -234,7 +238,9 @@ export class CardService implements OnModuleInit {
     });
 
     const updatedSum = Number(sumRaw ?? 0);
-    await card.update({ up_down: updatedSum });
+    const updatedCard = await card.update({ up_down: updatedSum });
+
+    return updatedCard;
   }
 
   async deleteCard(cardId: string, userUid: string) {

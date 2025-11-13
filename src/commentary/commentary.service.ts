@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  HttpException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -120,7 +121,7 @@ export class CommentaryService {
     commentId: string,
     like: boolean,
     userUid: string,
-  ): Promise<void> {
+  ): Promise<CommentaryModel> {
     const card = await this.cardService.getCardById(cardId);
 
     const comment = await this.commentModel.findOne({
@@ -144,7 +145,7 @@ export class CommentaryService {
       this.logger.warn(
         `User ${userUid} attempted to vote the same way again on comment ${commentId}`,
       );
-      return;
+      throw new HttpException('Vote already recorded', 409);
     }
 
     if (!existingVote) {
@@ -162,6 +163,8 @@ export class CommentaryService {
     });
 
     const updatedSum = Number(sumRaw ?? 0);
-    await comment.update({ up_down: updatedSum });
+    const updatedComment = await comment.update({ up_down: updatedSum });
+
+    return updatedComment;
   }
 }

@@ -4,4 +4,3 @@ export class DeleteResponseDto {
   @ApiProperty({ example: true })
   success!: boolean;
 }
-

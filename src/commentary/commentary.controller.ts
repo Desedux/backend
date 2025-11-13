@@ -2,6 +2,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiNoContentResponse,
@@ -32,6 +33,7 @@ import { VoteCommentaryDto } from './dto/request/reaction.dto';
 import { UserUid } from '../decorator/user-uid.decorator';
 import { CommentResponseDto } from './dto/request/comment.response.dto';
 import { PaginatedCommentsResponse } from './dto/response/PaginatedCommentsResponse';
+import { CommentaryModel } from './commentary.model';
 
 @ApiTags('commentary')
 @Controller('commentary')
@@ -211,8 +213,15 @@ export class CommentaryController {
     description: 'Não autenticado.',
     schema: { example: { statusCode: 403, message: 'Forbidden Access' } },
   })
-  async voteCard(@Body() dto: VoteCommentaryDto, @UserUid() userUid: string) {
-    await this.commentaryService.vote(
+  @ApiConflictResponse({
+    description: 'Voto já registrado da mesma forma.',
+    schema: { example: { statusCode: 409, message: 'Vote already recorded' } },
+  })
+  async voteCard(
+    @Body() dto: VoteCommentaryDto,
+    @UserUid() userUid: string,
+  ): Promise<CommentaryModel> {
+    return await this.commentaryService.vote(
       dto.cardId,
       dto.commentaryId,
       dto.isUpvote,
