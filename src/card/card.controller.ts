@@ -212,6 +212,6 @@ export class CardController {
   })
   async deleteCard(@Param('id') cardId: string, @UserUid() userUid: string) {
     await this.cardService.deleteCard(cardId, userUid);
-    return 'This action deletes a card';
+    return {};
   }
 }
