@@ -40,7 +40,10 @@ export class EmailService {
     const recoveryKey = this.generateVerificationCode();
 
     if (shouldSend) {
-      const displayName = user?.displayName ?? 'estudante';
+      const defaultName = email.includes('professores')
+        ? 'professor'
+        : 'estudante';
+      const displayName = user?.displayName ?? defaultName;
       const subject = recovery
         ? 'Seu codigo de verificação para recuperar sua senha'
         : 'Verifique a sua conta Desedux';
