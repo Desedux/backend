@@ -42,7 +42,13 @@ export class CommentaryService {
   ) {
     await this.cardService.getCardById(String(cardId));
 
-    const where: any = { card_id: cardId, parent_id: parentCommentId ?? null };
+    const where: any = { card_id: cardId };
+
+    // se vier parentId, filtra só as replies daquele comentário
+    if (parentCommentId !== undefined && parentCommentId !== null) {
+      where.parent_id = parentCommentId;
+    }
+
     const offset = (pageNumber - 1) * itemsPerPage;
 
     const { rows, count } = await this.commentModel.findAndCountAll({
@@ -62,8 +68,18 @@ export class CommentaryService {
       };
     }
 
+    const hasMore = offset + rows.length < count;
+
+    // usuário não logado -> user_vote = 0
     if (!userUid) {
       for (const comment of rows) {
+        if (comment.deactivate) {
+          (comment as any).setDataValue(
+            'content',
+            'Este comentário foi deletado pelo autor',
+          );
+        }
+
         (comment as any).setDataValue('user_vote', 0);
       }
 
@@ -72,11 +88,19 @@ export class CommentaryService {
         total: count,
         pageNumber,
         itemsPerPage,
-        hasMore: offset + rows.length < count,
+        hasMore,
       };
     }
 
+    // usuário logado -> calcula user_vote
     for (const comment of rows) {
+      if (comment.deactivate) {
+        (comment as any).setDataValue(
+          'content',
+          'Este comentário foi deletado pelo autor',
+        );
+      }
+
       const existingVote = await this.commentVoteModel.findOne({
         where: {
           comment_id: comment.id,
@@ -93,7 +117,7 @@ export class CommentaryService {
       total: count,
       pageNumber,
       itemsPerPage,
-      hasMore: offset + rows.length < count,
+      hasMore,
     };
   }
 
@@ -215,5 +239,32 @@ export class CommentaryService {
     (updatedComment as any).setDataValue('user_vote', newVote);
 
     return updatedComment;
+  }
+
+  async delete(
+    cardId: number,
+    commentaryId: number,
+    userUid: string,
+  ): Promise<CommentaryModel> {
+    const comment = await this.commentModel.findOne({
+      where: { id: commentaryId, card_id: cardId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (comment.user_uid !== userUid) {
+      throw new ForbiddenException('You cannot delete this comment');
+    }
+
+    if (comment.deactivate) {
+      return comment;
+    }
+
+    comment.deactivate = true;
+    await comment.save();
+
+    return comment;
   }
 }

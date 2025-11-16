@@ -48,6 +48,9 @@ export class CommentaryModel extends Model<
   @Column({ type: DataType.INTEGER, allowNull: true })
   declare parent_id: CreationOptional<number | null>;
 
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  declare deactivate: CreationOptional<boolean>;
+
   @BelongsTo(() => CardModel)
   declare card?: NonAttribute<CardModel>;
 

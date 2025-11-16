@@ -17,6 +17,7 @@ import {
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -85,16 +86,21 @@ export class CommentaryController {
     @Query('parentId') parentId?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
+    @UserUid() userUid?: string,
   ) {
     const pageNumber = Number(page) || 1;
     const itemsPerPage = Math.min(Number(limit) || 20, 100);
     const parentCommentId = parentId ? Number(parentId) : undefined;
 
-    return await this.commentaryService.list(cardId, {
-      parentCommentId,
-      pageNumber,
-      itemsPerPage,
-    });
+    return await this.commentaryService.list(
+      cardId,
+      {
+        parentCommentId,
+        pageNumber,
+        itemsPerPage,
+      },
+      userUid,
+    );
   }
 
   @UseGuards(AuthGuard)
@@ -227,5 +233,17 @@ export class CommentaryController {
       dto.isUpvote,
       userUid,
     );
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Delete(':cardId/:commentId')
+  @ApiNoContentResponse({ description: 'Comentário desativado.' })
+  async delete(
+    @Param('cardId', ParseIntPipe) cardId: number,
+    @Param('commentId', ParseIntPipe) commentId: number,
+    @UserUid() userUid: string,
+  ): Promise<CommentaryModel> {
+    return await this.commentaryService.delete(cardId, commentId, userUid);
   }
 }
