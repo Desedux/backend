@@ -4,7 +4,6 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
-  HttpException,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
@@ -39,8 +38,8 @@ export class CommentaryService {
   async list(
     cardId: number,
     { parentCommentId, pageNumber, itemsPerPage }: ListOptions,
+    userUid?: string,
   ) {
-    // valida existência do card via CardService
     await this.cardService.getCardById(String(cardId));
 
     const where: any = { card_id: cardId, parent_id: parentCommentId ?? null };
@@ -52,6 +51,42 @@ export class CommentaryService {
       limit: itemsPerPage,
       offset,
     });
+
+    if (rows.length === 0) {
+      return {
+        data: [],
+        total: count,
+        pageNumber,
+        itemsPerPage,
+        hasMore: false,
+      };
+    }
+
+    if (!userUid) {
+      for (const comment of rows) {
+        (comment as any).setDataValue('user_vote', 0);
+      }
+
+      return {
+        data: rows,
+        total: count,
+        pageNumber,
+        itemsPerPage,
+        hasMore: offset + rows.length < count,
+      };
+    }
+
+    for (const comment of rows) {
+      const existingVote = await this.commentVoteModel.findOne({
+        where: {
+          comment_id: comment.id,
+          user_id: userUid,
+        },
+      });
+
+      const userVote = existingVote ? existingVote.vote : 0;
+      (comment as any).setDataValue('user_vote', userVote);
+    }
 
     return {
       data: rows,
@@ -132,8 +167,6 @@ export class CommentaryService {
       throw new NotFoundException('Comment not found');
     }
 
-    const newVote = like ? 1 : -1;
-
     const existingVote = await this.commentVoteModel.findOne({
       where: {
         comment_id: comment.id,
@@ -141,11 +174,25 @@ export class CommentaryService {
       },
     });
 
-    if (existingVote && existingVote.vote === newVote) {
-      this.logger.warn(
-        `User ${userUid} attempted to vote the same way again on comment ${commentId}`,
-      );
-      throw new HttpException('Vote already recorded', 409);
+    const currentVote = existingVote ? existingVote.vote : 0;
+    let newVote: number;
+
+    if (like) {
+      if (currentVote === 1) {
+        newVote = 0;
+      } else if (currentVote === 0) {
+        newVote = 1;
+      } else {
+        newVote = 0;
+      }
+    } else {
+      if (currentVote === -1) {
+        newVote = 0;
+      } else if (currentVote === 0) {
+        newVote = -1;
+      } else {
+        newVote = 0;
+      }
     }
 
     if (!existingVote) {
@@ -164,6 +211,8 @@ export class CommentaryService {
 
     const updatedSum = Number(sumRaw ?? 0);
     const updatedComment = await comment.update({ up_down: updatedSum });
+
+    (updatedComment as any).setDataValue('user_vote', newVote);
 
     return updatedComment;
   }

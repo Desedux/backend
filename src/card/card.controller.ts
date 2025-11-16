@@ -32,7 +32,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { UserUid } from '../decorator/user-uid.decorator';
 import { CardModel } from './card.model';
 import { VoteDto } from './dto/request/updateCard';
-
+@ApiBearerAuth()
 @ApiTags('card')
 @Controller('card')
 export class CardController {
@@ -53,8 +53,9 @@ export class CardController {
   })
   async getAllCards(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @UserUid() userUid: string,
   ): Promise<CardModel[]> {
-    return this.cardService.getCards(page);
+    return this.cardService.getCards(page, undefined, userUid);
   }
 
   @Get('detail/:id')
@@ -75,8 +76,11 @@ export class CardController {
       example: { statusCode: 404, message: 'Card not found' },
     },
   })
-  async getCardById(@Param('id') cardId: string): Promise<CardModel> {
-    return await this.cardService.getCardById(cardId);
+  async getCardById(
+    @Param('id') cardId: string,
+    @UserUid() userUid: string,
+  ): Promise<CardModel> {
+    return await this.cardService.getCardById(cardId, userUid);
   }
 
   @Get('tag/:category')
@@ -101,13 +105,13 @@ export class CardController {
   async getCardsByCategory(
     @Param('category') category: number,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @UserUid() userUid: string,
   ): Promise<CardModel[]> {
-    return this.cardService.getCards(page, category);
+    return this.cardService.getCards(page, category, userUid);
   }
 
   @Post()
   @UseGuards(AuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Criar um novo card' })
   @ApiBody({
     type: CreateCardDto,
@@ -142,13 +146,12 @@ export class CardController {
   async createCard(
     @Body() createCardDto: CreateCardDto,
     @UserUid() userUid: string,
-  ) : Promise<CardModel>{
+  ): Promise<CardModel> {
     return await this.cardService.createCard(createCardDto, userUid);
   }
 
   @Patch()
   @UseGuards(AuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Votar em um card (up/down)' })
   @ApiBody({
     examples: {},

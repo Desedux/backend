@@ -154,14 +154,36 @@ export class CardService implements OnModuleInit {
     return card;
   }
 
-  async getCardById(cardId: string): Promise<CardModel> {
+  async getCardById(cardId: string, userUid?: string): Promise<CardModel> {
     const card = await this.cardModel.findByPk(cardId);
     if (!card || card.deactivated)
       throw new HttpException('Card not found', 404);
+
+    let userVote = 0;
+
+    if (userUid) {
+      const existingVote = await this.cardVoteModel.findOne({
+        where: {
+          card_id: card.id,
+          user_id: userUid,
+        },
+      });
+
+      if (existingVote) {
+        userVote = existingVote.vote;
+      }
+    }
+
+    (card as any).setDataValue('user_vote', userVote);
+
     return card;
   }
 
-  async getCards(page: number, category?: number): Promise<CardModel[]> {
+  async getCards(
+    page: number,
+    category?: number,
+    userUid?: string,
+  ): Promise<CardModel[]> {
     const limit = 20;
     const offset = (page - 1) * limit;
 
@@ -186,7 +208,28 @@ export class CardService implements OnModuleInit {
     }
 
     const cards = await this.cardModel.findAll(options);
-    return cards.length > 0 ? cards : [];
+    if (cards.length === 0) return [];
+
+    if (!userUid) {
+      for (const card of cards) {
+        (card as any).setDataValue('user_vote', 0);
+      }
+      return cards;
+    }
+
+    for (const card of cards) {
+      const existingVote = await this.cardVoteModel.findOne({
+        where: {
+          card_id: card.id,
+          user_id: userUid,
+        },
+      });
+
+      const userVote = existingVote ? existingVote.vote : 0;
+      (card as any).setDataValue('user_vote', userVote);
+    }
+
+    return cards;
   }
 
   async getCardCategories(): Promise<string[]> {
@@ -208,7 +251,6 @@ export class CardService implements OnModuleInit {
     userUid: string,
   ): Promise<CardModel> {
     const card = await this.getCardById(cardId);
-    const newVote = like ? 1 : -1;
 
     const existingVote = await this.cardVoteModel.findOne({
       where: {
@@ -217,11 +259,25 @@ export class CardService implements OnModuleInit {
       },
     });
 
-    if (existingVote && existingVote.vote === newVote) {
-      this.logger.warn(
-        `User ${userUid} attempted to vote the same way again on card ${cardId}`,
-      );
-      throw new HttpException('Vote already recorded', 409);
+    const currentVote = existingVote ? existingVote.vote : 0;
+    let newVote: number;
+
+    if (like) {
+      if (currentVote === 1) {
+        newVote = 0;
+      } else if (currentVote === 0) {
+        newVote = 1;
+      } else {
+        newVote = 0;
+      }
+    } else {
+      if (currentVote === -1) {
+        newVote = 0;
+      } else if (currentVote === 0) {
+        newVote = -1;
+      } else {
+        newVote = 0;
+      }
     }
 
     if (!existingVote) {
