@@ -33,7 +33,7 @@ export class CardService implements OnModuleInit {
     await this.refreshTagCounts();
   }
 
-  @Interval(5 * 60 * 1000)
+  @Interval(5 * 10 * 1000)
   async scheduledRefreshTagCounts() {
     await this.refreshTagCounts();
   }
