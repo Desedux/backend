@@ -34,7 +34,6 @@ export class CommentaryService {
     private readonly cardService: CardService,
   ) {}
 
-  // Lista comentários do card (nível raiz ou respostas)
   async list(
     cardId: number,
     { parentCommentId, pageNumber, itemsPerPage }: ListOptions,
@@ -44,7 +43,6 @@ export class CommentaryService {
 
     const where: any = { card_id: cardId };
 
-    // se vier parentId, filtra só as replies daquele comentário
     if (parentCommentId !== undefined && parentCommentId !== null) {
       where.parent_id = parentCommentId;
     }
@@ -70,7 +68,6 @@ export class CommentaryService {
 
     const hasMore = offset + rows.length < count;
 
-    // usuário não logado -> user_vote = 0
     if (!userUid) {
       for (const comment of rows) {
         if (comment.deactivate) {
@@ -92,7 +89,6 @@ export class CommentaryService {
       };
     }
 
-    // usuário logado -> calcula user_vote
     for (const comment of rows) {
       if (comment.deactivate) {
         (comment as any).setDataValue(
@@ -121,12 +117,9 @@ export class CommentaryService {
     };
   }
 
-  // Cria comentário (ou reply se vier parentId)
   async create(cardId: number, dto: CreateCommentDto, userUid: string) {
-    // valida card via CardService
     await this.cardService.getCardById(String(cardId));
 
-    // valida parent (se for reply), sempre dentro do mesmo card
     if (dto.parentId) {
       const parent = await this.commentModel.findOne({
         where: { id: dto.parentId, card_id: cardId },
@@ -136,7 +129,6 @@ export class CommentaryService {
       }
     }
 
-    // autor pelo Firebase
     const user = await this.firebaseService.getUserByUid(userUid);
     if (!user) throw new NotFoundException('User not found');
 
@@ -146,20 +138,17 @@ export class CommentaryService {
       author: user.displayName ?? 'Usuário',
       content: dto.content,
       parent_id: dto.parentId ?? null,
-      // up_down tem default no model/migration
     });
 
     return created;
   }
 
-  // Atualiza comentário (somente autor)
   async update(
     cardId: number,
     commentId: number,
     dto: UpdateCommentDto,
     userUid: string,
   ) {
-    // opcional: valida existência do card
     await this.cardService.getCardById(String(cardId));
 
     const comment = await this.commentModel.findOne({
