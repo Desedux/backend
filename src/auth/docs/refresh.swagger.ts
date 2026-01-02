@@ -23,7 +23,7 @@ export function SwaggerRefresh() {
         example: {
           statusCode: 401,
           message: 'Invalid refresh token',
-          error: 'Bad Request',
+          error: 'Unauthorized',
         },
       },
     }),

@@ -24,7 +24,7 @@ export function SwaggerLogin() {
         example: {
           statusCode: 401,
           message: 'Invalid login credentials',
-          error: 'Bad Request',
+          error: 'Unauthorized',
         },
       },
     }),
