@@ -1,24 +1,19 @@
-import { Inject, Injectable, forwardRef } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { TagModel } from './tags.model';
-import { CardService } from '../card/card.service';
 import { TagResponseDto } from './dto/response/TagResponseDto';
+import { TagStatsService } from './tag-stats.service';
 
 @Injectable()
 export class TagsService {
   constructor(
     @InjectModel(TagModel) private readonly tagModel: typeof TagModel,
-    @Inject(forwardRef(() => CardService))
-    private readonly cardService: CardService,
+    private readonly tagStatsService: TagStatsService,
   ) {}
-
-  // async getAllTags(): Promise<TagModel[]> {
-  //   return this.tagModel.findAll();
-  // }
 
   async getAllTags(): Promise<TagResponseDto[]> {
     const tags = await this.tagModel.findAll();
-    const counts = await this.cardService.getAllTagCounts();
+    const counts = await this.tagStatsService.getAllTagCounts();
 
     return tags.map((t) => {
       const j = t.toJSON();
@@ -40,7 +35,7 @@ export class TagsService {
 
   async getTagByIdsWithCount(ids: number[]): Promise<TagResponseDto[]> {
     const tags = await this.tagModel.findAll({ where: { id: ids } });
-    const counts = await this.cardService.getTagCounts(ids);
+    const counts = await this.tagStatsService.getTagCounts(ids);
 
     return tags.map((t) => {
       const j = t.toJSON();
