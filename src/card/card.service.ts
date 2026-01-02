@@ -1,132 +1,23 @@
-import {
-  HttpException,
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 import { CreateCardDto } from './dto/request/createCard';
 import { InjectModel } from '@nestjs/sequelize';
 import { CardModel } from './card.model';
 import { FirebaseService } from '../firebase/firebase.service';
-import { QueryTypes } from 'sequelize';
 import { TagsService } from '../tags/tags.service';
-import { Interval } from '@nestjs/schedule';
-import { TagModel } from '../tags/tags.model';
 import { CardVoteModel } from './card-vote.model';
+import { TagModel } from '../tags/tags.model';
+import { TagStatsService } from '../tags/tag-stats.service';
 
 @Injectable()
-export class CardService implements OnModuleInit {
-  private logger: Logger = new Logger();
-
+export class CardService {
   constructor(
     @InjectModel(CardModel) private readonly cardModel: typeof CardModel,
     @InjectModel(CardVoteModel)
     private readonly cardVoteModel: typeof CardVoteModel,
     private readonly firebaseService: FirebaseService,
     private readonly tagsService: TagsService,
+    private readonly tagStatsService: TagStatsService,
   ) {}
-
-  private tagCountCache = new Map<number, number>();
-  private lastCountsRefreshAt = 0;
-
-  async onModuleInit() {
-    await this.refreshTagCounts();
-  }
-
-  @Interval(5 * 10 * 1000)
-  async scheduledRefreshTagCounts() {
-    await this.refreshTagCounts();
-  }
-
-  private async refreshTagCounts() {
-    if (!this.cardModel.sequelize) return;
-    const rows = await this.cardModel.sequelize.query<{
-      tag_id: number;
-      total: any;
-    }>(
-      `
-          SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
-          FROM card_tags ct
-                   JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-          GROUP BY ct.tag_id
-      `,
-      { type: QueryTypes.SELECT },
-    );
-
-    const next = new Map<number, number>();
-    for (const r of rows) next.set(Number(r.tag_id), Number(r.total));
-    this.tagCountCache = next;
-    this.lastCountsRefreshAt = Date.now();
-  }
-
-  private async refreshSingleTag(tagId: number) {
-    if (!this.cardModel.sequelize) return;
-    const row = await this.cardModel.sequelize.query<{ total: any }>(
-      `
-          SELECT COUNT(DISTINCT c.id) AS total
-          FROM card_tags ct
-                   JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-          WHERE ct.tag_id = :tagId
-      `,
-      { type: QueryTypes.SELECT, replacements: { tagId } },
-    );
-    const total = row.length ? Number(row[0].total) : 0;
-    this.tagCountCache.set(tagId, total);
-  }
-
-  async getTagCount(tagId: number): Promise<number> {
-    const hit = this.tagCountCache.get(tagId);
-    if (typeof hit === 'number') return hit;
-    await this.refreshSingleTag(tagId);
-    return this.tagCountCache.get(tagId) ?? 0;
-  }
-
-  async getTagCounts(tagIds: number[]): Promise<Record<number, number>> {
-    const result: Record<number, number> = {};
-    const missing: number[] = [];
-    for (const id of tagIds) {
-      const hit = this.tagCountCache.get(id);
-      if (typeof hit === 'number') result[id] = hit;
-      else missing.push(id);
-    }
-    if (missing.length && this.cardModel.sequelize) {
-      const rows = await this.cardModel.sequelize.query<{
-        tag_id: number;
-        total: any;
-      }>(
-        `
-            SELECT ct.tag_id, COUNT(DISTINCT c.id) AS total
-            FROM card_tags ct
-                     JOIN card c ON c.id = ct.card_id AND c.deactivated = false
-            WHERE ct.tag_id IN (:ids)
-            GROUP BY ct.tag_id
-        `,
-        { type: QueryTypes.SELECT, replacements: { ids: missing } },
-      );
-      const found = new Set<number>();
-      for (const r of rows) {
-        const id = Number(r.tag_id);
-        const total = Number(r.total);
-        this.tagCountCache.set(id, total);
-        result[id] = total;
-        found.add(id);
-      }
-      for (const id of missing) {
-        if (!found.has(id)) {
-          this.tagCountCache.set(id, 0);
-          result[id] = 0;
-        }
-      }
-    }
-    return result;
-  }
-
-  async getAllTagCounts(): Promise<Record<number, number>> {
-    if (!this.tagCountCache.size) await this.refreshTagCounts();
-    const out: Record<number, number> = {};
-    for (const [k, v] of this.tagCountCache.entries()) out[k] = v;
-    return out;
-  }
 
   async createCard(
     createCardDto: CreateCardDto,
@@ -149,8 +40,7 @@ export class CardService implements OnModuleInit {
 
     const tagIds = tags.map((t) => t.id);
     await card.$set('tags', tagIds);
-    for (const id of tagIds)
-      this.tagCountCache.set(id, (this.tagCountCache.get(id) ?? 0) + 1);
+    await this.tagStatsService.invalidateTagCounts();
     return card;
   }
 
@@ -232,19 +122,6 @@ export class CardService implements OnModuleInit {
     return cards;
   }
 
-  async getCardCategories(): Promise<string[]> {
-    if (!this.cardModel.sequelize) return [];
-    const sql = `
-        SELECT DISTINCT UNNEST(tags) AS tag
-        FROM card
-        WHERE array_length(tags, 1) > 0
-    `;
-    const results = await this.cardModel.sequelize.query<{ tag: string }>(sql, {
-      type: QueryTypes.SELECT,
-    });
-    return (results as { tag: string }[]).map((r) => r.tag);
-  }
-
   async vote(
     cardId: string,
     like: boolean,
@@ -305,20 +182,6 @@ export class CardService implements OnModuleInit {
     if (card.user_id !== userUid) throw new HttpException('Forbidden', 403);
     await card.update({ deactivated: true });
 
-    if (this.cardModel.sequelize) {
-      const rows = await this.cardModel.sequelize.query<{ tag_id: number }>(
-        `SELECT tag_id
-         FROM card_tags
-         WHERE card_id = :cardId`,
-        { type: QueryTypes.SELECT, replacements: { cardId } },
-      );
-      for (const r of rows) {
-        const id = Number(r.tag_id);
-        this.tagCountCache.set(
-          id,
-          Math.max(0, (this.tagCountCache.get(id) ?? 0) - 1),
-        );
-      }
-    }
+    await this.tagStatsService.invalidateTagCounts();
   }
 }

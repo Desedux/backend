@@ -1,11 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  Length,
-  Matches,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsNewtonPaivaEmail } from '../../decorator/email-validator.decorator';
 
 export class RegisterUserDto {
   @ApiProperty({ example: 'Gabriel', description: "The user's first name" })
@@ -28,10 +23,7 @@ export class RegisterUserDto {
   })
   @IsNotEmpty()
   @IsEmail()
-  @Matches(/^[A-Za-z0-9._%+-]+@(alunos|professores)\.newtonpaiva\.edu\.br$/, {
-    message:
-      'The email must belong to the domains alunos.newtonpaiva.edu.br or professores.newtonpaiva.edu.br.',
-  })
+  @IsNewtonPaivaEmail()
   email!: string;
 
   @ApiProperty({

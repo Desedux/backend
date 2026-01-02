@@ -4,6 +4,7 @@ import {
   Model,
   ForeignKey,
   DataType,
+  BelongsTo,
 } from 'sequelize-typescript';
 import { InferAttributes, InferCreationAttributes } from 'sequelize';
 import { CardModel } from './card.model';
@@ -30,4 +31,10 @@ export class CardTagModel extends Model<
     allowNull: false,
   })
   declare tag_id: number;
+
+  @BelongsTo(() => CardModel)
+  declare card?: CardModel;
+
+  @BelongsTo(() => TagModel)
+  declare tag?: TagModel;
 }

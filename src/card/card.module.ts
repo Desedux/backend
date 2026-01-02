@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { SequelizeModule } from '@nestjs/sequelize';
 import { CardModel } from './card.model';
 import { CardService } from './card.service';
@@ -11,7 +11,7 @@ import { CardVoteModel } from './card-vote.model';
 @Module({
   imports: [
     SequelizeModule.forFeature([CardModel, CardTagModel, CardVoteModel]),
-    forwardRef(() => TagsModule),
+    TagsModule,
   ],
   providers: [CardService, FirebaseService],
   controllers: [CardController],

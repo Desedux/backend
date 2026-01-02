@@ -47,6 +47,7 @@ export class UserService {
 
     await this.userModel.create({
       uid: firebaseUser.uid,
+      //todo: this logic needs change with new roles implementation
       role: registerUser.email.includes('alunos.newtonpaiva.edu.br')
         ? 'student'
         : 'teacher',
