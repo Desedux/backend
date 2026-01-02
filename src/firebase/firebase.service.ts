@@ -3,6 +3,7 @@ import {
   BadRequestException,
   HttpException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { auth } from 'firebase-admin';
@@ -12,10 +13,13 @@ import axios from 'axios';
 import { CreateRequest, DecodedIdToken } from 'firebase-admin/auth';
 import { FirebaseRefreshTokenResponse } from './interface/firebaseRefreshToken.interface';
 import { FirebaseSignInResponse } from './interface/firebaseSignInResponse.interface';
+import { FirebaseErrorResponse } from './interface/firebaseErrorResponse';
+import { InternalServerErrorException } from '@nestjs/common/exceptions/internal-server-error.exception';
 
 @Injectable()
 export class FirebaseService {
   private readonly apiKey: string;
+  private logger: Logger = new Logger(this.constructor.name);
 
   constructor(firebaseConfig: FirebaseConfigService) {
     this.apiKey = firebaseConfig.apiKey;
@@ -117,19 +121,24 @@ export class FirebaseService {
   }
 
   private handleRestApiError(error: any) {
-    if (error.response?.data?.error?.code === 400) {
-      const messageKey = error.response?.data?.error?.message;
+    const errorResponse: FirebaseErrorResponse | undefined =
+      error?.response?.data;
+    if (errorResponse?.error?.code === 400) {
+      const messageKey = errorResponse.error?.message;
       const message =
         {
           INVALID_LOGIN_CREDENTIALS: 'Invalid login credentials',
           INVALID_REFRESH_TOKEN: 'Invalid refresh token',
           TOKEN_EXPIRED: 'Token expired',
           USER_DISABLED: 'User disabled',
-        }[messageKey] ?? messageKey;
+        }[messageKey] ??
+        'Something went wrong with your credentials. Please try again later.';
 
       throw new UnauthorizedException(message);
     }
-
-    throw new Error(error?.message);
+    this.logger.error(
+      `[handleRestApiError]: Unknown error: ${JSON.stringify(errorResponse)}`,
+    );
+    throw new InternalServerErrorException('Something went wrong');
   }
 }
