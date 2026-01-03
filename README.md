@@ -40,9 +40,10 @@ A plataforma promove transparência, colaboração e facilita o acesso à inform
 
 ## Stack
 
-* Node 22.20.0
+* Node 24.11.0
 * NestJS + TypeScript
 * PostgreSQL
+* Redis (cache de contagem de tags e códigos)
 * Sequelize ORM 6.37.x + sequelize-typescript
 * Sequelize CLI 6.6.x
 * Swagger/OpenAPI
@@ -51,10 +52,11 @@ A plataforma promove transparência, colaboração e facilita o acesso à inform
 
 ## Pré-requisitos
 
-* Node 22.20.0 e npm 10+
-* PostgreSQL 14+ com um banco criado
-* Credenciais de serviço do Firebase Admin para validação de tokens
-* Credenciais de e-mail para envio de tokens de verificação e refatoração de senha
+* Node 24.11.0 e npm 10+
+* PostgreSQL 14+
+* Redis 7+ (cache de contagem de tags e armazenamento de códigos de verificação)
+* Firebase: API Key para REST + credenciais de service account para o Admin SDK
+* Conta de e-mail (transporter configurado para Gmail) com senha de app para envio dos códigos de verificação/recuperação
 
 ---
 
@@ -73,48 +75,61 @@ npm ci
 
 ## Configuração de ambiente
 
-Crie um arquivo `.env` na raiz com as variáveis abaixo. As variáveis de e-mail são usadas pelo serviço de envio de tokens durante criação de conta e refatoração de senha.
+Crie um arquivo `.env` na raiz. O app lê essas variáveis para Firebase, banco, Redis e e-mail (valores entre parênteses são defaults).
 
 ```ini
-APP_ENV=local
+PORT=3001
+FRONTEND_URL=http://localhost:3000
 
 # Firebase
 FIREBASE_API_KEY=your_firebase_api_key
 # JSON completo da service account do Firebase Admin em uma única linha
 FIREBASE_ADMIN_CREDENTIALS={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\nABC...XYZ\n-----END PRIVATE KEY-----\n","client_email":"firebase-adminsdk@seu-projeto.iam.gserviceaccount.com","client_id":"...","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk%40seu-projeto.iam.gserviceaccount.com"}
 
-# E-mail remetente para tokens de verificação e refatoração de senha
-EMAIL_USER=your_email
-EMAIL_PASSWORD=your_email_api_password
+# E-mail (Gmail por padrão via Nodemailer)
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_gmail_app_password
 
 # PostgreSQL
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 POSTGRES_USER=admin
 POSTGRES_PASSWORD=secretpassword
 POSTGRES_DB=mydatabase
-POSTGRES_PORT=5432
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
 ```
 
 Observações rápidas:
 
 * `FIREBASE_ADMIN_CREDENTIALS` deve conter o JSON da service account. Mantenha as quebras de linha do `private_key` com `\n`.
-* O provedor de e-mail depende do que foi configurado no projeto. `EMAIL_USER` e `EMAIL_PASSWORD` precisam ter permissão de envio SMTP ou API usada no código.
+* `FRONTEND_URL` define a origem liberada no CORS (padrão `http://localhost:3000`) e `PORT` define a porta da API (padrão `3001`).
+* O transporter de e-mail usa `service: 'gmail'`; se usar outro provedor, ajuste a configuração em `EmailService`.
+* Redis é usado para guardar códigos de verificação/recuperação e cache de contagem de tags; se as variáveis não forem definidas, usa `localhost:6379`.
 
 ---
 
 ## Banco de dados
 
-O projeto lê a configuração via `.env`. Passos:
+O app (SequelizeModule) lê `POSTGRES_*` do `.env` com fallback `admin/secretpassword@localhost:5432/mydatabase`. O `sequelize-cli` usa `.sequelizerc` apontando para `src/database/config.js`.
+
+Passos locais:
 
 ```bash
-# 1) Crie o banco se necessário
-# psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE mydatabase;"
+# Subir dependências (Postgres + Redis)
+docker-compose up -d postgres redis
 
-# 2) Executar migrações
-npx sequelize-cli db:migrate
+# Criar o banco, se ainda não existir
+psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE mydatabase;"
 
-# 3) Executar seeds
-npx sequelize-cli db:seed:all
+# Migrar e popular
+npm run db:migrate          # ou npx sequelize-cli db:migrate
+npm run db:seed             # ou npx sequelize-cli db:seed:all
 ```
+
+Se usar host/credenciais diferentes, ajuste as variáveis `POSTGRES_*` ou edite `src/database/config.js`.
 
 ---
 
@@ -129,8 +144,8 @@ npm run build
 npm run start:prod
 ```
 
-Swagger UI: [http://localhost:3001/api](http://localhost:3000/api)
-> A porta padrão é `3000`, mas pode ser alterada pela variável `PORT`.
+Swagger UI: [http://localhost:3001/api](http://localhost:3001/api) (ativo apenas se `NODE_ENV` for diferente de `production`)
+> Porta padrão `3001` (configurável via `PORT`).
 
 ---
 
@@ -144,10 +159,10 @@ npm run lint
 npm test
 
 # Migrações e seeds
-npx sequelize-cli db:migrate
-npx sequelize-cli db:migrate:undo
-npx sequelize-cli db:seed:all
-npx sequelize-cli db:seed:undo:all
+npm run db:migrate
+npm run db:migrate:undo:all
+npm run db:seed
+npm run db:seed:undo
 ```
 
 ---
@@ -163,150 +178,54 @@ Authorization: Bearer <ID_TOKEN>   # obrigatório nas rotas protegidas
 
 ### Health
 
-#### GET `/`
+* **GET `/`** — Retorna status, uptime no formato `0h1m2s` e timestamp ISO.
 
-Retorna status do servidor.
-
-Resposta:
+Exemplo:
 
 ```json
 {
   "status": "ok",
-  "message": "Server running",
-  "uptime": 123.45,
+  "message": "API is running",
+  "uptime": "0h1m2s",
   "timestamp": "2025-01-01T12:00:00.000Z"
 }
 ```
 
-### Auth e User
+### Auth
 
-Fluxo baseado em Firebase. O cliente obtém o ID token no app e envia no header `Authorization`.
+* **POST `/auth/login`** — Body `{ "email": "...", "password": "..." }`. Usa Firebase e retorna `{ idToken, refreshToken, expiresIn }`.
+* **POST `/auth/refresh`** — Body `{ "refreshToken": "..." }`. Retorna tokens atualizados.
 
-Rotas existentes:
+### User
 
-* `POST /auth/login`
-* `POST /auth/refresh`
-* `POST /user/verification-token`
-* `POST /user/refactor-token`
-* `POST /user/register`
-* `PATCH /user/change-password`
-* `GET /user/profile`
+* **POST `/user/verification-token`** — Envia código de 5 dígitos para criar conta (e-mails `@alunos`/`@professores`). Usa Redis para limitar tentativas.
+* **POST `/user/refactor-token`** — Envia código de recuperação de senha para o mesmo domínio institucional.
+* **POST `/user/register`** — Body `{ firstName, token, email, password }`. Requer código de verificação; cria usuário no Firebase e registra no banco com role derivada do domínio.
+* **PATCH `/user/change-password`** — Body `{ email, token, newPassword }`. Usa o código recebido em `/user/refactor-token`.
+* **GET `/user/profile`** (autenticado) — Retorna o payload do `verifyIdToken` do Firebase.
 
 ### Tags
 
-#### GET `/tags`
-
-Lista tags.
-
-Resposta exemplo:
-
-```json
-[
-  { "id": 1, "name": "Segurança", "description": "..." },
-  { "id": 2, "name": "Educação", "description": "..." }
-]
-```
+* **GET `/tags`** — Lista tags com contagem de cards ativos (`count`). Não requer autenticação.
 
 ### Cards
 
-#### GET `/card/{page}`
-
-Lista cards paginados, 20 por página, ordenados por `up_down DESC`.
-
-Parâmetros:
-
-* `page` path param
-
-#### GET `/card/detail/{id}`
-
-Retorna um card por id.
-
-#### POST `/card`  (autenticado)
-
-Cria card.
-
-Body:
-
-```json
-{
-  "title": "Sugestão de melhoria",
-  "description": "Adicionar modo offline",
-  "isAnonymous": false,
-  "tags": [1, 2]
-}
-```
-
-#### PATCH `/card/{id}`  (autenticado)
-
-Voto agregado do card.
-
-Body:
-
-```json
-{ "isUpvote": true }
-```
-
-#### DELETE `/card/{id}`  (autenticado)
-
-Remove o card conforme regras de autorização.
+* **GET `/card?page=1`** — Lista cards ativos, 20 por página, ordenados por `up_down DESC`. Se houver token, inclui `user_vote`.
+* **GET `/card/detail/:id`** — Detalhe do card (inclui `user_vote` se houver token).
+* **GET `/card/tag/:category?page=1`** — Cards filtrados pelo id da tag.
+* **POST `/card`** (autenticado) — Cria card. Body `{ title, description, isAnonymous, tags: [1, 2] }`. Define `author` como "Anônimo" se solicitado; caso contrário usa `displayName` do Firebase.
+* **PATCH `/card`** (autenticado) — Vota no card. Body `{ cardId, isUpvote }`. Alterna entre like/neutral/dislike, atualiza `up_down` e devolve `user_vote`.
+* **DELETE `/card/:id`** (autenticado) — Soft delete (`deactivated = true`). Somente o autor.
 
 ### Comentários
 
 Base path: `/commentary`
 
-#### GET `/commentary/{cardId}`
-
-Lista comentários do card. Suporta paginação e thread.
-
-Query:
-
-* `parentId` opcional. Omitido para raiz, definido para replies.
-* `page` opcional, padrão 1
-* `limit` opcional, padrão 20, máx 100
-
-#### POST `/commentary/{cardId}`  (autenticado)
-
-Cria comentário ou reply.
-
-Body:
-
-```json
-{ "content": "Concordo com a ideia", "parentId": null }
-```
-
-#### PATCH `/commentary/{cardId}/{commentId}`  (autenticado)
-
-Edita conteúdo.
-
-Body:
-
-```json
-{ "content": "Atualizando o texto" }
-```
-
-#### DELETE `/commentary/{cardId}/{commentId}`  (autenticado)
-
-Remove comentário. Requer ser autor.
-
-#### PATCH `/commentary/{cardId}/{commentId}/reaction`  (autenticado)
-
-Define reação do usuário ao comentário.
-
-Body:
-
-```json
-{ "action": "like" }   // like | dislike | none
-```
-
-Resposta:
-
-```json
-{
-  "commentId": 15,
-  "up_down": 4,
-  "myReaction": "like"
-}
-```
+* **GET `/commentary/:cardId`** — Lista comentários do card. Query: `parentId` (opcional), `page` (padrão 1), `limit` (padrão 20, máx 100). Comentários desativados retornam mensagem padrão. Inclui `user_vote` quando há token.
+* **POST `/commentary/:cardId`** (autenticado) — Cria comentário ou reply. Body `{ content, parentId? }`.
+* **PATCH `/commentary/:cardId/:commentId`** (autenticado) — Atualiza conteúdo (somente autor). Body `{ content }`.
+* **PATCH `/commentary`** (autenticado) — Vota no comentário. Body `{ cardId, commentaryId, isUpvote }`. Atualiza `up_down` e `user_vote`.
+* **DELETE `/commentary/:cardId/:commentId`** (autenticado) — Marca comentário como desativado (soft delete do autor).
 
 ---
 
@@ -314,38 +233,32 @@ Resposta:
 
 * `user(uid, role, created_at, updated_at)`
 * `tag(id, name, description, image_url, created_at, updated_at)`
-* `card(id, title, description, author, user_id, up_down, created_at, updated_at)`
+* `card(id, title, description, author, user_id, up_down, deactivated, created_at, updated_at)`
 * `card_tags(card_id, tag_id)` pivot N:N
-* `comment(id, card_id, user_uid, author, content, up_down, parent_id, created_at, updated_at)`
-* `comment_reaction(comment_id, user_uid, action)`
+* `card_vote(card_id, user_id, vote, created_at, updated_at)`
+* `comment(id, card_id, user_uid, author, content, up_down, parent_id, deactivate, created_at, updated_at)`
+* `comment_vote(comment_id, user_id, vote, created_at, updated_at)`
 * `SequelizeMeta`
 
 Relacionamentos:
 
 * Card N:N Tag por `card_tags`
-* Comment N:1 Card
+* Card 1:N Comment
 * Comment 1:N Comment via `parent_id`
-* Reação por par (`comment_id`, `user_uid`)
+* Card 1:N CardVote | Comment 1:N CommentVote
+
+Obs.: existe uma migração legada que cria `comment_reaction`, mas o código usa `comment_vote` para armazenar likes/dislikes.
 
 ---
 
 ## Boas práticas e notas
 
-* Enviar `Authorization: Bearer <ID_TOKEN>` em rotas protegidas.
-* Paginação padrão 20 itens, `limit` até 100.
-* Registre modelos pivô no módulo `SequelizeModule.forFeature` para relações N:N.
-* `EMAIL_USER` e `EMAIL_PASSWORD` devem pertencer a uma conta habilitada para envio no provedor configurado.
-
----
-## Contribuidores
-
-Abaixo os nomes das pessoas que contribuíram para o projeto. Adicione nome e, opcionalmente, o papel.
-
-- Nome Completo — papel (ex.: backend, frontend, design)
-- Gabriel Marliere de Souza — backend
-- Gabriel de Almeida Paro — backend
-- Ryan Alves da Costa — design
-- Alexandre de Noronha José — frontend
+* Envie `Authorization: Bearer <ID_TOKEN>` nas rotas protegidas; sem header os endpoints públicos funcionam, mas `user_vote` retorna `0`.
+* CORS libera apenas `FRONTEND_URL` (padrão `http://localhost:3000`); a API sobe em `PORT` (padrão `3001`) e o Swagger só aparece fora de produção.
+* Paginação: cards fixo em 20 itens via `page`; comentários usam `page` e `limit` (padrão 20, máx 100).
+* Códigos de verificação/recuperação ficam 10 min no Redis com limite de 5 tentativas por e-mail; a contagem de tags é cacheada por 5 min.
+* `EmailService` usa Gmail + senha de app; troque o `service` se usar outro provedor.
+* Exclusão de card/comentário é soft delete (`deactivated`/`deactivate`); comentários desativados retornam mensagem placeholder.
 
 ---
 
