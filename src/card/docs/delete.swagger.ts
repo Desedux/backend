@@ -23,19 +23,30 @@ export function SwaggerDeleteCard() {
     }),
     ApiOkResponse({
       description: 'Card excluído (soft delete).',
-      schema: { example: 'This action deletes a card' },
+      schema: { example: {} },
     }),
     ApiForbiddenResponse({
-      description: 'Usuário não é o autor do card.',
-      schema: { example: { statusCode: 403, message: 'Forbidden' } },
+      description: 'Não autenticado.',
+      schema: {
+        example: {
+          message: 'Forbidden resource',
+          error: 'Forbidden',
+          statusCode: 403,
+        },
+      },
     }),
     ApiNotFoundResponse({
       description: 'Card não encontrado.',
       schema: { example: { statusCode: 404, message: 'Card not found' } },
     }),
     ApiUnauthorizedResponse({
-      description: 'Não autenticado.',
-      schema: { example: { statusCode: 401, message: 'Unauthorized' } },
+      description: 'Não é o dono do card.',
+      schema: {
+        example: {
+          statusCode: 401,
+          message: 'You are not allowed to do this action.',
+        },
+      },
     }),
   );
 }

@@ -5,7 +5,6 @@ import {
   ApiParam,
   ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { CardModel } from '../card.model';
 
 export function SwaggerDetailCard() {
   return applyDecorators(
@@ -18,7 +17,20 @@ export function SwaggerDetailCard() {
     }),
     ApiOkResponse({
       description: 'Card encontrado.',
-      type: CardModel,
+      example: {
+        id: 2,
+        title:
+          'Cantina fechada há três dias: previsão de retorno e alternativas',
+        description:
+          'A cantina está fechada há três dias seguidos. Há previsão de reabertura? Existe alternativa temporária para compra de lanches e refeições nos intervalos?',
+        author: 'Anônimo',
+        up_down: 23,
+        user_id: 'uid_anon_1',
+        deactivated: false,
+        created_at: '2024-01-14T15:45:00.000Z',
+        updated_at: '2025-11-17T11:58:49.905Z',
+        user_vote: 0,
+      },
     }),
     ApiNotFoundResponse({
       description: 'Card não encontrado.',

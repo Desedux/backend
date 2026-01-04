@@ -1,4 +1,10 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateCardDto } from './dto/request/createCard';
 import { InjectModel } from '@nestjs/sequelize';
 import { CardModel } from './card.model';
@@ -24,10 +30,10 @@ export class CardService {
     userUid: string,
   ): Promise<CardModel> {
     const user = await this.firebaseService.getUserByUid(userUid);
-    if (!user) throw new HttpException('User not found', 404);
+    if (!user) throw new NotFoundException('User not found');
 
     const tags = await this.tagsService.getTagByIds(createCardDto.tags);
-    if (!tags.length) throw new HttpException('Tags not found', 400);
+    if (!tags.length) throw new BadRequestException('Tags not found');
 
     const card = await this.cardModel.create({
       title: createCardDto.title,
@@ -47,7 +53,7 @@ export class CardService {
   async getCardById(cardId: string, userUid?: string): Promise<CardModel> {
     const card = await this.cardModel.findByPk(cardId);
     if (!card || card.deactivated)
-      throw new HttpException('Card not found', 404);
+      throw new NotFoundException('Card not found');
 
     let userVote = 0;
 
@@ -179,7 +185,9 @@ export class CardService {
 
   async deleteCard(cardId: string, userUid: string) {
     const card = await this.getCardById(cardId);
-    if (card.user_id !== userUid) throw new HttpException('Forbidden', 403);
+    if (card.user_id !== userUid) {
+      throw new UnauthorizedException('You are not allowed to do this action.');
+    }
     await card.update({ deactivated: true });
 
     await this.tagStatsService.invalidateTagCounts();

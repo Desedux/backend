@@ -4,6 +4,8 @@ import {
   DefaultValuePipe,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -58,6 +60,7 @@ export class CardController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   @SwaggerCreateCard()
   async createCard(
     @Body() createCardDto: CreateCardDto,

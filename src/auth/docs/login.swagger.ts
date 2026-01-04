@@ -3,6 +3,7 @@ import {
   ApiOperation,
   ApiUnauthorizedResponse,
   ApiOkResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 
 import { LoginResponseDto } from '../dto/login.response.dto';
@@ -25,6 +26,16 @@ export function SwaggerLogin() {
           statusCode: 401,
           message: 'Invalid login credentials',
           error: 'Unauthorized',
+        },
+      },
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Firebase returned a unknown response',
+      schema: {
+        example: {
+          statusCode: 500,
+          message: 'Something went wrong',
+          error: 'Internal Server Error',
         },
       },
     }),

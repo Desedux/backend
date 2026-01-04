@@ -3,6 +3,7 @@ import {
   ApiOperation,
   ApiUnauthorizedResponse,
   ApiOkResponse,
+  ApiInternalServerErrorResponse,
 } from '@nestjs/swagger';
 import { RefreshResponseDto } from '../dto/refresh.response.dto';
 
@@ -24,6 +25,16 @@ export function SwaggerRefresh() {
           statusCode: 401,
           message: 'Invalid refresh token',
           error: 'Unauthorized',
+        },
+      },
+    }),
+    ApiInternalServerErrorResponse({
+      description: 'Firebase returned a unknown response',
+      schema: {
+        example: {
+          statusCode: 500,
+          message: 'Something went wrong',
+          error: 'Internal Server Error',
         },
       },
     }),
